@@ -93,8 +93,8 @@ final class BibleReaderViewModel {
     }
 
     private func removeUnpermittedVersions() async {
-        if let permittedVersions = try? await YouVersionAPI.Bible.versions() {
-            let permittedIds = Set(permittedVersions.map(\.id))
+        if let versions = try? await YouVersionAPI.Bible.versions(fields: [.id]) {
+            let permittedIds = Set(versions.map(\.id))
             await versionRepository.removeUnpermittedVersions(permittedIds: permittedIds)
 
             for version in self.myVersions where !permittedIds.contains(version.id) {
@@ -159,7 +159,7 @@ final class BibleReaderViewModel {
             return downloads.first!
         }
 
-        if let versions = try? await YouVersionAPI.Bible.versions() {
+        if let versions = try? await YouVersionAPI.Bible.versions(fields: [.id, .languageTag]) {
             // are any of the permitted versions in their myVersions list?
             for version in versions where savedIds.contains(version.id) {
                 return version.id
@@ -301,7 +301,7 @@ final class BibleReaderViewModel {
 
     // MARK: - Versions list
 
-    var permittedVersions: [BibleVersion] = []
+    var permittedVersionIdsAndLanguages: [BibleVersion] = []
 
     var showFullProgressViewOverlay = false
 
@@ -340,7 +340,7 @@ final class BibleReaderViewModel {
         }
         let codes = extractLanguageCodes(languages: self.languagesList)
         let ret = codes.filter { code in
-            permittedVersions.isEmpty || permittedVersions.contains(where: { $0.languageTag == code })
+            permittedVersionIdsAndLanguages.isEmpty || permittedVersionIdsAndLanguages.contains(where: { $0.languageTag == code })
         }
         return ret
     }

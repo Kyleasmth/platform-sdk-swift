@@ -5,12 +5,12 @@ import YouVersionPlatformUI
 extension BibleReaderViewModel {
 
     func loadVersionsList() {
-        guard permittedVersions.isEmpty else {
+        guard permittedVersionIdsAndLanguages.isEmpty else {
             return
         }
         Task {
             do {
-                let versions = try await YouVersionAPI.Bible.versions()
+                let versions = try await YouVersionAPI.Bible.versions(fields: [.id, .languageTag, .localizedTitle])  // INSUFFICIENT for all use cases. Keep going.
                 let deduplicated = versions
                     .sorted { $0.id < $1.id }
                     .reduce(into: [BibleVersion]()) { result, version in
@@ -23,23 +23,25 @@ extension BibleReaderViewModel {
                     ($0.title ?? "").localizedCaseInsensitiveCompare($1.title ?? "") == .orderedAscending
                 }
                 await MainActor.run {
-                    permittedVersions = sorted
+                    permittedVersionIdsAndLanguages = sorted
                 }
             } catch {
                 print("Error loading versions: \(error)")
                 await MainActor.run {
-                    permittedVersions = []
+                    showGenericAlert = true
+                    textForGenericAlertTitle = .localized("generic.error")
+                    textForGenericAlertBody = "It was not possible to get the list of Bible versions. Please try again later."
                 }
             }
         }
     }
 
     public var bibleVersionStatisticsPromo: String {
-        guard !permittedVersions.isEmpty else {
+        guard !permittedVersionIdsAndLanguages.isEmpty else {
             return ""
         }
-        let num = permittedVersions.count
-        let uniqueLanguages = Set(permittedVersions.map { $0.languageTag }).count
+        let num = permittedVersionIdsAndLanguages.count
+        let uniqueLanguages = Set(permittedVersionIdsAndLanguages.map { $0.languageTag }).count
         return String(format: .localized("versionList.statisticsFormat"), num, uniqueLanguages)
     }
 

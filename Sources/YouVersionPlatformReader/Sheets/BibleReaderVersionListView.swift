@@ -17,7 +17,7 @@ public struct BibleReaderVersionListView: View {
                     viewModel.versionsStackPush(to: .languages)
                 }
             Group {
-                if viewModel.permittedVersions.isEmpty {
+                if viewModel.permittedVersionIdsAndLanguages.isEmpty {
                     VStack {
                         Spacer()
                         ProgressView()
@@ -95,7 +95,7 @@ public struct BibleReaderVersionListView: View {
     }
     private var languageDisplay: some View {
         let language = activeLanguage
-        let versionsInLanguage = viewModel.permittedVersions.filter { $0.languageTag == language }
+        let versionsInLanguage = viewModel.permittedVersionIdsAndLanguages.filter { $0.languageTag == language }
         return HStack {
             Image(systemName: "globe")
             Text(languageName(language))
@@ -116,17 +116,17 @@ public struct BibleReaderVersionListView: View {
     private var filteredVersions: [BibleVersion] {
         let language = activeLanguage
         guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return viewModel.permittedVersions.filter {
+            return viewModel.permittedVersionIdsAndLanguages.filter {
                 $0.languageTag == language
             }
         }
         let query = searchText.lowercased()
-        return viewModel.permittedVersions.filter { v in
+        return viewModel.permittedVersionIdsAndLanguages.filter { v in
             guard v.languageTag == language else {
                 return false
             }
-            let title = (v.title ?? "").lowercased()
-            let abbr = (v.abbreviation ?? String(v.id)).lowercased()
+            let title = (v.localizedTitle ?? v.title ?? "").lowercased()
+            let abbr = (v.localizedAbbreviation ?? v.abbreviation ?? String(v.id)).lowercased()
             let lang = (v.languageTag ?? "")
             return title.contains(query) || abbr.contains(query) || lang.contains(query)
         }
