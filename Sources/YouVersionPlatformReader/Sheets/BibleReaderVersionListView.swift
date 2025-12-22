@@ -5,6 +5,8 @@ import YouVersionPlatformUI
 public struct BibleReaderVersionListView: View {
     @Environment(BibleReaderViewModel.self) private var viewModel
     @State private var searchText = ""
+    //@State private var filteredVersions: [BibleVersion]? = nil
+    @State private var languageVersionsMap: [String: [BibleVersion]] = [:]
 
     public var body: some View {
         VStack(spacing: 0) {
@@ -17,7 +19,8 @@ public struct BibleReaderVersionListView: View {
                     viewModel.versionsStackPush(to: .languages)
                 }
             Group {
-                if viewModel.permittedVersionIdsAndLanguages.isEmpty {
+                let versions = filteredVersions
+                if versions == nil {
                     VStack {
                         Spacer()
                         ProgressView()
@@ -25,8 +28,13 @@ public struct BibleReaderVersionListView: View {
                         Spacer()
                         Spacer()
                     }
+                } else if versions?.isEmpty == true {
+                    Spacer()
+                    Text("No versions are available.")
+                    Spacer()
+                    Spacer()
                 } else {
-                    List(filteredVersions, id: \.id) { v in
+                    List(versions!, id: \.id) { v in
                         BibleVersionOverviewListItem(item: v)
                             .listRowBackground(viewModel.readerCanvasPrimaryColor)
                             .listRowSeparator(.hidden)
@@ -56,6 +64,12 @@ public struct BibleReaderVersionListView: View {
         }
         .foregroundStyle(viewModel.readerTextPrimaryColor)
         .background(viewModel.readerCanvasPrimaryColor)
+        .onAppear {
+            //filteredVersions = nil
+//            Task {
+//                await loadFilteredVersions(language: activeLanguage)
+//            }
+        }
     }
 
     private var searchInput: some View {
@@ -113,18 +127,32 @@ public struct BibleReaderVersionListView: View {
         .padding()
     }
 
-    private var filteredVersions: [BibleVersion] {
+    private var filteredVersions: [BibleVersion]? {
         let language = activeLanguage
-        guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return viewModel.permittedVersionIdsAndLanguages.filter {
-                $0.languageTag == language
+        // if we don't have it cached yet, start fetch in background, and return nil to show the ProgressView.
+        guard let versions = languageVersionsMap[language] else {
+            Task {
+                print("Fetching versions for language: \(language)")
+                guard let versions = try? await YouVersionAPI.Bible.versions(forLanguageTag: language, fields: [.id, .abbreviation, .title, .localizedTitle, .localizedAbbreviation]) else {
+                    print("Could not load versions for language: \(language)")
+                    languageVersionsMap[language] = []
+                    return
+                }
+                await MainActor.run {
+                    languageVersionsMap[language] = versions
+                }
             }
+            return nil
         }
-        let query = searchText.lowercased()
-        return viewModel.permittedVersionIdsAndLanguages.filter { v in
-            guard v.languageTag == language else {
-                return false
-            }
+
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else {
+            return versions
+        }
+        return versions.filter { v in
+//            guard v.languageTag == language else {
+//                return false
+//            }
             let title = (v.localizedTitle ?? v.title ?? "").lowercased()
             let abbr = (v.localizedAbbreviation ?? v.abbreviation ?? String(v.id)).lowercased()
             let lang = (v.languageTag ?? "")
