@@ -20,7 +20,7 @@ public struct BibleVersion: Codable, Sendable, Hashable, Equatable {
     // TEMPORARY:
     public let requiresEmailAgreement = false
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case id
         case abbreviation
         case promotionalContent = "promotional_content"

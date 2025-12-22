@@ -12,6 +12,7 @@ public extension YouVersionAPI.Bible {
     /// - Parameters:
     ///   - languageTag: An optional language code per BCP 47 for filtering available Bible versions. If `nil`
     ///     the function returns versions for all languages.
+    ///   - fields: If empty, fetches all fields; otherwise only requests the given fields from the API.
     ///   - session: The URLSession used to perform the request. Defaults to `URLSession.shared`.
     /// - Returns: An array of ``BibleVersion`` objects representing the available Bible versions for the language.
     ///
@@ -20,18 +21,32 @@ public extension YouVersionAPI.Bible {
     ///   - `YouVersionAPIError.notPermitted` if the app key is invalid or lacks permission.
     ///   - `YouVersionAPIError.cannotDownload` if the server returns an error response.
     ///   - `YouVersionAPIError.invalidResponse` if the server response is not valid.
-    static func versions(forLanguageTag languageTag: String? = nil, accessToken providedToken: String? = nil, session: URLSession = .shared) async throws -> [BibleVersion] {
+    static func versions(
+        forLanguageTag languageTag: String? = nil,
+        fields: [BibleVersion.CodingKeys] = [],
+        accessToken providedToken: String? = nil,
+        session: URLSession = .shared
+    ) async throws -> [BibleVersion] {
         let accessToken = providedToken ?? YouVersionPlatformConfiguration.accessToken
         let range = languageTag == nil ? [] : [languageTag!]
 
         var allResults: [BibleVersion] = []
         var pageToken: String?
+        let fieldStrings = fields.map(\.rawValue)
+        let pageSize: Int?
+        switch fieldStrings.count {
+        case 1...3:
+            pageSize = nil
+        default:
+            pageSize = 99
+        }
 
         repeat {
-            guard let url = URLBuilder.versionsURL(languageRanges: range, pageSize: 99, pageToken: pageToken) else {
+            guard let url = URLBuilder.versionsURL(languageRanges: range, fields: fieldStrings, pageSize: pageSize, pageToken: pageToken) else {
                 throw URLError(.badURL)
             }
 
+            //print("versions() is fetching: \(url))")
             let request = YouVersionAPI.buildRequest(url: url, accessToken: accessToken, session: session)
             let (data, response) = try await session.data(for: request)
 
@@ -52,6 +67,7 @@ public extension YouVersionAPI.Bible {
 
             let responseObject = try JSONDecoder().decode(BibleVersionsResponse.self, from: data)
             allResults.append(contentsOf: responseObject.data)
+            //print("that returned \(responseObject.data.count) versions")
             pageToken = responseObject.next_page_token
             if responseObject.data.isEmpty {
                 pageToken = nil
